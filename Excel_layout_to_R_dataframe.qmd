@@ -1,0 +1,79 @@
+---
+title: "Excel plate layout to R dataframe"
+author: 'Bartosz Wiernicki'
+format: html
+editor: visual
+---
+
+## Explanation
+
+Objective: To transfer the plate layout from the MS Excel spreadsheet to the R dataframe.
+
+This code is an alternative to using the plate tool in FlowJo software, but the strategy can be used in experiments where the results of an experiment are shown in the data frame formati and the plate layout is prepared as a 12x8 format in Microsoft Excel. The strategy covers only 96 well plates.
+
+**Strategy:**
+
+1.  Create excel file based on the template.xlsx file. Each sheet should hold observations about one variable. The name of the variable is the sheet name. The same cells in excel file must be occupied for different variables (see the example). Create as many sheets (variables) as it is necessary.
+
+2.  Run the layout(path) function, where path refers to the path of the Excel file containing the layout. The result of the function is the data frame will all variables as columns.
+
+3.  Merge the R data frame with the results dataframe (e.g. using inner_join() function).
+
+## About the MS Excel file
+
+The MS Excel allows for a flexible plate layout generation. The example file has three sheets: **Names** (refers to the position of the well on the plate), **Names_flow_jo** refers to the position of the wells with the string '.fcs' added at the end similarly to the way FlowJo exports the data, and **Template** that can be used for creating the variable names. For ease of use the Template spreadsheet has been conditionally formatted, where the word 'empty' is colored in gray (these wells were not used in the experiment) and any input is going to be colored in green. This helps with making sure that all wells have values for each variable assigned. When new variable has to be created one can simply copy that sheet and fill it in with necessary information. Once the file is created it can be used for the data frame generation.
+
+## Code
+
+```{r}
+
+############# Load the libraries ################
+library(tidyverse)
+library(readxl)
+
+############# Provide the path to the excel file #############
+path.to.excel <- './excel_layouts/template.xlsx'
+
+############ Function to create a layout data frame ##########
+
+layout <- function(path) {
+
+# extract the sheet names from the file (variable names)
+sheet_names <- readxl::excel_sheets(path)
+
+# Loop through the sheets gathering all the data and pivoting into the long format
+info.table <- list()
+for (sheet_name in sheet_names) {
+  df <- readxl::read_xlsx(path, sheet = sheet_name, col_names = FALSE)
+  df <- df |>
+    mutate(mock = 'MOCK') |>
+    pivot_longer(cols = -mock,
+                 values_to = sheet_name,
+                 names_to ='Number') |>
+    select(all_of(sheet_name))
+  info.table[[sheet_name]] <- df
+}
+
+# Create a dataframe from all the generated vectors
+layout.table <- do.call(cbind, info.table) %>% 
+    select(-Template)
+
+# Remove the empty wells from the data frame.
+layout.table <<- filter_all(layout.table, all_vars(. != 'empty')) 
+}
+
+```
+
+## Example
+
+In the following example the results of the experiment 1 will be merged with the plate layout data frame generated from the FlowJo analysis:
+
+```{r}
+results <- read.csv('./datasets/Experiment1_results.csv')
+results
+layout(path = './excel_layouts/Experiment1_layout.xlsx')
+layout.table
+
+df <- inner_join(results, layout.table, by=c('X' = 'Names_flow_jo'))
+df
+```

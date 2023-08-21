@@ -3,8 +3,9 @@
 library(tidyverse)
 library(readxl)
 
-#Fill in the path to your excel spreadsheet
+#Fill in the path to  excel spreadsheet
 path.to.excel <- './excel_layouts/example.xlsx'
+
 
 layout <- function(path) {
 
@@ -18,12 +19,15 @@ for (sheet_name in sheet_names) {
     pivot_longer(cols = -mock,
                  values_to = sheet_name,
                  names_to ='Number') |>
-    select(sheet_name)
+    select(all_of(sheet_name))
   info.table[[sheet_name]] <- df
 }
+
 layout.table <- do.call(cbind, info.table) 
 layout.table <<- filter_all(layout.table, all_vars(. != 'NA'))
 }
 
 layout(path = path.to.excel)
 layout.table
+
+
